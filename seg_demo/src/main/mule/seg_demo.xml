@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:gmail="http://www.mulesoft.org/schema/mule/gmail"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:kafka="http://www.mulesoft.org/schema/mule/kafka" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/kafka http://www.mulesoft.org/schema/mule/kafka/current/mule-kafka.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/gmail http://www.mulesoft.org/schema/mule/gmail/current/mule-gmail.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<kafka:consumer-config name="Apache_Kafka_Consumer_configuration" doc:name="Apache Kafka Consumer configuration" doc:id="4949a203-b142-49f2-9f86-8d93f1617919" >
+		<kafka:consumer-plaintext-connection >
+			<kafka:bootstrap-servers >
+				<kafka:bootstrap-server value="tcp://cloud-services.demos.mulesoft.com:30272" />
+			</kafka:bootstrap-servers>
+			<kafka:topic-patterns >
+				<kafka:topic-pattern value='#["MyFirstTopic"]' />
+			</kafka:topic-patterns>
+		</kafka:consumer-plaintext-connection>
+	</kafka:consumer-config>
+	<kafka:producer-config name="Apache_Kafka_Producer_configuration" doc:name="Apache Kafka Producer configuration" doc:id="56ba619b-b1ed-4b3e-b8d0-05861157a609" >
+		<kafka:producer-plaintext-connection >
+			<kafka:bootstrap-servers >
+				<kafka:bootstrap-server value="tcp://cloud-services.demos.mulesoft.com:30272" />
+			</kafka:bootstrap-servers>
+		</kafka:producer-plaintext-connection>
+	</kafka:producer-config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="71008793-4765-4c3a-8360-a6a5f4b5cd6e" basePath="/publishMessageToQueue" >
+		<http:listener-connection host="0.0.0.0" port="8082" />
+	</http:listener-config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="46262f5f-03a7-4ec3-9dcd-0fcf3967d999" >
+		<file:connection workingDir="/Users/starumani/Desktop/SEG" />
+	</file:config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="3479b955-5158-4aef-8dfb-d2737711af15" >
+		<db:my-sql-connection host="cloud-services.demos.mulesoft.com" port="32682" user="sahitya8e7" password="MuleSoftMuleSoft_2024" database="demodb" />
+	</db:config>
+	<http:listener-config name="Gmail_HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="e11da3b7-bd41-4ac9-be2b-6cfd386eb87c" >
+		<http:listener-connection host="localhost" port="8081" />
+	</http:listener-config>
+	<flow name="seg_demoFlow1" doc:id="9c83cc65-bb29-41e5-85cd-0f254c107247" >
+		<http:listener doc:name="Listener" doc:id="b258f8ef-5d04-4b62-ba53-17a5d99c938b" config-ref="HTTP_Listener_config" path="/"/>
+		<file:read doc:name="Read" doc:id="40c4ecbc-b6f9-42d0-a95c-e01f8edeeba5" config-ref="File_Config" path='#["Promotions.xlsx"]'/>
+		<ee:transform doc:name="Transform Message" doc:id="2276d7b6-fdac-4bb3-a294-6b69dc958dbb" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+read(payload, 'application/xlsx')]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<!-- [STUDIO:"Select"]<db:select doc:name="Select" doc:id="e66b857a-bd4c-4e05-9c41-202c8ed1c44c" /> [STUDIO] -->
+		<ee:transform doc:name="Transform Message" doc:id="56d4db03-6d17-43be-a29e-565d0043147d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+---
+payload."Sheet1"]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<kafka:publish doc:name="Publish" doc:id="ec1b9612-cdaf-48f2-97dd-13846be04755" config-ref="Apache_Kafka_Producer_configuration" topic='#["MyFirstTopic"]' partition="0" key='#["This is a test"]'/>
+	</flow>
+	<flow name="seg_demoFlow" doc:id="edb9685a-1113-42f3-a2b2-6902d7f6b887" >
+		<kafka:message-listener doc:name="Message listener" doc:id="4a11c53e-0c37-4674-8a50-768063408f6a" config-ref="Apache_Kafka_Consumer_configuration"/>
+		<ee:transform doc:name="Transform Message" doc:id="0f46d4fe-5c3c-4701-9b7b-89b74d25a20f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+read(payload, "application/csv")]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="16b21122-5e0b-432e-ab06-5df427b0b2db" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+fun changeDateFormat(dateObj) = dateObj as String {format: "uuuu-MM-dd"} as String
+var formattedItems = map(payload, (item, index) -> "('" ++
+	item."Item ID" as String ++
+	"'" ++ "," ++ "'" ++ 
+	item."Item Name" ++ 
+	"'" ++ "," ++ "'" ++ 
+	item."Vendor Name" ++
+	"'" ++ "," ++ "'" ++ 
+	changeDateFormat(item."Start Date" as DateTime) ++
+	"'" ++ "," ++ "'" ++ 
+	changeDateFormat(item."End Date" as DateTime) ++
+	"'" ++ "," ++ "'" ++
+	item."Promotion Description" ++
+	"'" ++ "," ++ "'" ++  
+	item."Promotion Discount" ++
+	"')"
+)
+output application/json
+---
+formattedItems joinBy (',')]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value='#["INSERT INTO promotions(itemID, itemName, vendorName, startDate, enddate, promotionDescription, promotionDiscount) values " ++ payload]' doc:name="insertQuery" doc:id="12413257-fd97-4913-bef5-c54600616745" variableName="insertQuery"/>
+		<db:insert doc:name="Insert" doc:id="f812a2aa-1903-492c-b067-1914de097242" config-ref="Database_Config">
+			<db:sql ><![CDATA[#[vars.insertQuery]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	values: payload
+}]]]></db:input-parameters>
+		</db:insert>
+		<logger level="INFO" doc:name="Logger" doc:id="30a5513e-1989-4bfa-aff2-8791bdc44b55" message="#[%dw 2.0&#10;output application/json&#10;---&#10;payload]"/>
+	</flow>
+</mule>
